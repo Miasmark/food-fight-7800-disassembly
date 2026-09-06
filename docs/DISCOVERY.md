@@ -249,3 +249,53 @@ Main Loop (at $00E2):
 3. **Level progression**: Find level counter and cone position table
 4. **Sound effects**: Trace AUDV0/AUDV1 writes for SFX
 5. **Sprite collision**: Find player-chef food collision detection
+
+## Music and Sound Effects
+
+### Audio System
+The game uses TIA audio (2 voices) via AUDV0 ($0019) and AUDV1 ($001A).
+- `sub_B71C` initializes audio to silence on each frame
+
+### Music Data ($B892-$B8F2)
+126 bytes of musical note data for the game's background music:
+
+```
+B892-BA71: 4-bar music pattern sequence
+```
+
+The data consists of byte values that represent musical note frequencies/durations.
+The routine at $B732 reads this data and writes to AUDV0/AUDV1.
+
+### Music Replay Feature
+The game supports instant replay (record and playback). Data locations:
+
+| Address | Purpose |
+|---------|---------|
+| `$25E8-$25EB` | Replay recording buffer (4 bytes) |
+| `$25CC-$25CF` | Replay playback buffer (4 bytes) |
+| `$250E-$2511` | Replay position tracking |
+
+Replay data is initialized in `sub_9C28` and used by the display rendering code.
+
+## Code Flow
+
+```
+RESET
+  └> sub_B000
+      └> sub_B1E8 (clear RAM, setup stack)
+          └> sub_B017 (initialize audio, NMI vector)
+              └> sub_B71C (audio silence)
+              └> sub_B3A7 (copy level data)
+              └> sub_B250 (sprite setup)
+                  └> sub_9B2D (main loop entry)
+
+Main Loop (at $00E2):
+  └> sub_9C28 (player/food setup)
+      └> sub_92F3 (clear sprite buffer)
+      └> sub_9DC7 (initialize sprites)
+      └> sub_9AA3 (player movement)
+          └> sub_9AD0 (render sprite positions)
+      └> sub_B6CF (read controllers)
+          └> sub_B71C (update display)
+              └> JMP ($00E2) - loop
+```
