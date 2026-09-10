@@ -32,3 +32,8 @@
 *-out.json
 
 .DS_Store
+
+# AppleDouble sidecars. macOS writes a `._name` beside every file when it
+# copies to a filesystem that cannot hold a resource fork -- a FAT or NTFS
+# volume, a USB stick, an SMB share. Metadata, never content.
+._*

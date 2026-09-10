@@ -14,11 +14,28 @@ command (below).
 
 ## Start here
 
-[`docs/FINDINGS.md`](docs/FINDINGS.md) is the real deliverable: a narrative of
-what's been confirmed live in MAME, what's still just a hint, and what was
-actively distrusted rather than assumed. **This is day one**, so read it as a
-starting map: most of the cartridge is currently one very large unexplained
-block.
+Two documents, and they do different jobs.
+
+[`docs/DISCOVERY.md`](docs/DISCOVERY.md) is the reference: the memory map,
+the data tables, the routines, the game mechanics as they were worked out.
+[`docs/FINDINGS.md`](docs/FINDINGS.md) is the narrative of what was
+confirmed live in MAME, what is still a hint, and what was actively
+distrusted rather than assumed. It was written on day one and reads that
+way; DISCOVERY.md has moved a long way past it.
+
+**Coverage is 39.7%** -- 13,010 of 32,768 bytes, 6,068 instructions -- and
+the reassembly is byte-identical. Most of what remains is data rather than
+missed code: `--check-gaps` finds no real call site into any unexplained
+range, so the two large blocks left (`$BFFD`-`$EFF9` and `$9FFA`-`$AFFF`)
+want describing rather than discovering.
+
+Getting there is a story worth reading before starting a similar project.
+A static trace of this cartridge reaches **3.2%** and stops, because the
+NMI and the main loop both dispatch through RAM pointers that no static
+reader can follow. Every routine named in DISCOVERY.md was reached at
+runtime through one of them -- and none of them had been fed back into
+`annotations.json`, where the disassembler would see them. Doing that took
+coverage from 3.2% to 39.6% without discovering anything new.
 
 Working discipline, same as the sibling projects: every claim about what a byte
 range does should be checked live before it's trusted, not pattern-matched from
