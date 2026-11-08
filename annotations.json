@@ -128,8 +128,15 @@
     "rom:C300": "dat_C300"
   },
   "ram": {},
-  "comments": {},
-  "headers": {},
+  "comments": {
+    "rom:B3B3": "copies the shadow palette $1FC3-$1FE1 to P0C1-P7C3, three bytes at a time, skipping every fourth register (stride 4). Called from the $B448 stage of the NMI chain and from rom:FBE4"
+  },
+  "headers": {
+    "rom:F081": "shadow-palette start values, not level configuration (corrected\n2026-11-08, see docs/DISCOVERY.md): sub_B3A7 copies 32 bytes, $F081-$F0A0,\nto $1FC3. Every fourth byte is the register slot sub_B3B3 skips",
+    "rom:F0C1": "DLL template, not sprite character data (corrected 2026-11-08, see\ndocs/DISCOVERY.md): sub_B22F copies $F0C1-$F0F9 (57 bytes, 19 three-byte\nentries) to $1F8A, and sub_B23B/sub_B250 point DPPH/DPPL there. Four\nentries carry the DLI bit ($89, $CF, $87, $8F), as many as the stages of\nthe $0040 NMI chain; five zones share the list at $1CFA",
+    "rom:9DF1": "stick direction table, not a debounce mask (corrected 2026-11-08, see\ndocs/DISCOVERY.md): 16 bytes indexed by the SWCHA nibble at rom:B6EC, the\nresult to ram_00FA. 0-7 clockwise from up, 8 for no direction or an\nimpossible pair",
+    "rom:B87C": "sound pointer tables, not music data (corrected 2026-11-08, see\ndocs/DISCOVERY.md): four tables of 33. $B87C/$B89D are the low/high bytes\nof each sound's note stream ($F6A6-$FB5C, read at rom:B7B5 and rom:B807);\n$B8BE/$B8DF those of its volume envelope ($F722-$FB1F, rom:B85B, written\nto AUDV at rom:B86F)"
+  },
   "blocks": [],
   "notes": {
     "rom": "Food Fight (NTSC) (Atari) (1987) (E64A5CDE).a78\nmapper linear, 32 KB, NTSC\nno POKEY declared; audio is the TIA's two voices\n\nVectors: IRQ $EFFD  NMI $B3C8  RESET $EFFA\n\nWritten by init.py. Everything here is read from the cartridge; the\njudgement calls are yours to add."

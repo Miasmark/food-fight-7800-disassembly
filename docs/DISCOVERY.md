@@ -42,9 +42,9 @@ High score: saved to cart
 | `$1CF5-$1DFF` | Sprite data (palette, position, graphics) |
 | `$1E47-$1E4B` | Score digits (unpacked BCD, 5 digits) |
 | `$1F3D-$1FDF` | Food inventory (16 slots) |
-| `$1FD7-$1FDF` | Game state (lives, level) |
-| `$1FDB-$1FDD` | Cone timer (32-second countdown) |
-| `$1FDF` | Lives counter |
+| `$1FD7-$1FDF` | Game state (lives, level) -- **corrected 2026-11-08:** palettes 5-7, see the note under "RAM Locations (Enemy/Level/Spawning)" |
+| `$1FDB-$1FDD` | Cone timer (32-second countdown) -- **corrected 2026-11-08:** palette 6, see the note under "RAM Locations (Enemy/Level/Spawning)" |
+| `$1FDF` | Lives counter -- **corrected 2026-11-08:** P7C1's shadow, see the note under "RAM Locations (Enemy/Level/Spawning)" |
 | `$2200-$26FF` | Sprite display buffers |
 | `$25CC-$25CF` | Replay playback buffer start addresses |
 | `$25E8-$25EB` | Replay recording buffer start addresses |
@@ -73,11 +73,27 @@ High score: saved to cart
 | `$FD-$FF` | Temporary enemy data storage |
 | `$1F89` | Enemy count / level index |
 | `$1F8A-$1F99` | Enemy sprite positions (11 bytes each) |
-| `$1FC3-$1FDF` | Level configuration copy from F081 |
-| `$1FD7-$1FDF` | Game state (lives, level) |
-| `$1FDB-$1FDD` | Cone timer (32-second countdown) |
+| `$1FC3-$1FDF` | Level configuration copy from F081 -- **corrected 2026-11-08:** shadow palette, see below |
+| `$1FD7-$1FDF` | Game state (lives, level) -- **corrected 2026-11-08:** palettes 5-7, see below |
+| `$1FDB-$1FDD` | Cone timer (32-second countdown) -- **corrected 2026-11-08:** palette 6, see below |
 | `$2603` | Bonus life flag / lives counter |
 | `$261E` | Score comparison buffer |
+
+**Corrected 2026-11-08: `$1FC3-$1FE1` is a shadow palette, not level
+configuration.** `sub_B3B3` copies it to the palette registers three bytes at a
+time and skips every fourth register (stride 4): `$1FC3-$1FC5` to
+`P0C1-P0C3` (`$21-$23`), `$1FC7-$1FC9` to `P1C1-P1C3`, and so on up to
+`$1FDF-$1FE1` to `P7C1-P7C3`. It runs from the `$B448` stage of the NMI chain
+(see "What the replay says about the two vectors"), so the copy happens every
+frame. `sub_B3A7` seeds all 32 bytes, `$1FC3-$1FE2`, from `$F081-$F0A0`.
+
+The rows above that put game state, the cone timer and the lives in the same
+range fall with it. `$1FD7-$1FD9` is palette 5 (stores of `$19/$15/$1F` at
+`$9B68`, `$BAE4`, `$FC46`), `$1FDB-$1FDD` is palette 6 (`$37/$35/$33` at
+`$9C28`) and `$1FDF-$1FE0` is palette 7 (from `dat_F1E9`/`dat_F1F3` at
+`$93C7`). Nothing reads those bytes except `sub_B3B3`, and nothing counts them
+down. Where the real cone timer and lives counter live is still open. This is
+read from the code; it was not watched live.
 
 ## Data Tables (at $F000-$F1FF)
 
@@ -143,6 +159,14 @@ F000: D4 2F D8 E8 E6 DE 2F B8 CC B8 C2 BA
 
 ### dat_F081 (0xF081-0xF095) - Level Configuration Data
 
+**Corrected 2026-11-08: these are the shadow palette's start values, not level
+configuration.** `sub_B3A7` copies 32 bytes, `$F081-$F0A0`, to `$1FC3-$1FE2`,
+and `sub_B3B3` copies that RAM to `P0C1-P7C3` (see the memory map above). The
+"4 bytes per level" are a palette's three colours plus the register slot
+`sub_B3B3` skips, which is why every "Byte 3" is `$00`. The last byte, `$F0A0`,
+is also the first entry of `dat_F0A0`. The reading below is kept as it was
+written.
+
 **Level Configuration Table (21 bytes total):**
 ```
 F081: 3A 84 1F 00 3C 70 0E 00 0C 0A 26 00 E6 EB E3 00  ; Level 1
@@ -192,6 +216,32 @@ F091: 37 33 3B 00 19 15 1F 00 E7 00 36 00 4C 48 29      ; Level 2+
 - 11 sprite frame offset entries
 
 ### dat_F0C1 (0xF0C1-0xF0FF) - Sprite Character Set Data
+
+**Corrected 2026-11-08: this is the DLL template, not sprite character data.**
+`sub_B22F` copies `$F0C1-$F0F9` (57 bytes, `LDX #$38`) to `$1F8A`, and
+`sub_B23B` and `sub_B250` point `DPPH/DPPL` at `$1F8A`. The 57 bytes are 19
+three-byte DLL entries (flags/offset, list high, list low), 257 lines in all:
+
+```
+89 1CF5   DLI, 10 lines         4F 1A3A   H16, 16 lines
+0F 1CFA   16 lines              4F 19C8   H16, 16 lines
+07 2200   8 lines               4F 1956   H16, 16 lines
+CF 1C83   DLI, H16, 16 lines    4F 18E4   H16, 16 lines
+4F 1C11   H16, 16 lines         4F 1872   H16, 16 lines
+4F 1B9F   H16, 16 lines         4F 1800   H16, 16 lines
+4F 1B28   H16, 16 lines         00 1CFA   1 line
+4F 1AB1   H16, 16 lines         87 2211   DLI, 8 lines
+                                0E 1CFA   15 lines
+                                06 1CFA   7 lines
+                                8F 1CFA   DLI, 16 lines
+```
+
+Read the left column first. Five zones share the list at `$1CFA`, which reads
+as a common empty list for the blank bands; its contents were not checked
+live. Four entries carry the DLI bit, as many as the stages of the `$0040`
+chain. `sub_FB6F` (High Score Cart) rewrites the first entry's list pointer to
+`$1CFA` as well. The chef reading below is kept as it was
+written.
 
 **Sprite Character Data (128 bytes total):**
 ```
@@ -249,6 +299,15 @@ F0FA: BE 40 00 1F 00 00 00 00 01 01 01 01 00 01 02 04
 02 03 00 01 02 03 00
 ```
 - Button debounce and input mask table
+
+**Corrected 2026-11-08: a stick direction table, not a debounce mask.**
+`sub_B6CF` takes the active player's SWCHA nibble, indexes this table with it
+at `$B6EC` and stores the result in `$FA`. Only the first 16 bytes belong to
+it (`$9DF1-$9E00`); the bytes from `$9E01` on are other tables. The values are
+the direction, 0-7 clockwise from up (`$E` = up gives 0, `$7` = right gives 2,
+`$D` = down gives 4, `$B` = left gives 6, the diagonals in between), and 8 for
+no direction or an impossible pair such as left and right together. This is
+read from the code; it was not watched live.
 
 ### dat_9E18 (0x9E18-0x9E1B)
 ```
@@ -332,6 +391,18 @@ B8F2: F8 F8 F8 F8 F9 F9 FA FA FA FB FB F7 FB FB A2 0C
 - 97 bytes of note data for the game's background music
 - Used by `sub_B732` to play music via AUDV0/AUDV1
 - Contains frequency/duration pairs for musical notes
+
+**Corrected 2026-11-08: `$B87C-$B8FF` are sound pointer tables, not music
+data.** There are four tables of 33 entries, and the range above starts in the
+middle of the first one. `$B87C`/`$B89D` hold the low/high bytes of each
+sound's note stream, read at `$B7B5` and `$B807`. `$B8BE`/`$B8DF` hold the
+low/high bytes of its volume envelope, read at `$B85B`/`$B861`, and the
+envelope goes to `AUDV0,X` at `$B86F`. The streams they point at sit between
+`$F6A6` and the High Score Cart code at `$FB6F`: note streams start between
+`$F6A6` and `$FB5C`, envelopes between `$F722` and `$FB1F`. The voice loop that
+reads them is `$B790-$B87B`. The dump above also runs past "97 bytes": it is
+112 bytes, `$B892-$B901`, and its last two bytes, `A2 0C`, are the first
+instruction of `sub_B900`.
 
 **dat_C000-C3FF (1024 bytes) - Zero Padding:**
 - Four 256-byte blocks of zero padding at $C000, $C100, $C200, $C300
@@ -534,7 +605,7 @@ Note: Food piles and manholes are completely separate systems. Food pile RAM sto
 | `$FD-$FF` | Temporary enemy data storage |
 | `$1F89` | Enemy count / level index |
 | `$1F8A-$1F99` | Enemy sprite positions (RAM) |
-| `$1FC3-$1FDF` | Level configuration copy |
+| `$1FC3-$1FDF` | Level configuration copy -- **corrected 2026-11-08:** shadow palette, see the note under "RAM Locations (Enemy/Level/Spawning)" |
 
 **Enemy State Machine ($8000-$83C0):**
 
@@ -782,7 +853,7 @@ $9E6E: 4C B9 9F     JMP $9FB9     ; COLLISION DETECTED!
 
 ### Ice Cream Cone
 - **1 cone per level** at random position
-- **32-second timer** (starts at `$37` = 55 frames, decrements)
+- **32-second timer** (starts at `$37` = 55 frames, decrements) -- **corrected 2026-11-08:** the `$37` is a colour written to `$1FDB`, P6C1's shadow, and nothing counts it down; see the note under "RAM Locations (Enemy/Level/Spawning)"
 - Cone position changes per level
 - Eating cone gives points and advances level
 
@@ -853,7 +924,7 @@ When a bonus life is awarded, the score is reduced to trigger future bonuses:
 |---------|---------|
 | `$2603` | Bonus life flag / lives counter |
 | `$261E` | Score comparison buffer |
-| `$1FDF` | Current lives displayed |
+| `$1FDF` | Current lives displayed -- **corrected 2026-11-08:** P7C1's shadow, see the note under "RAM Locations (Enemy/Level/Spawning)" |
 
 **Bonus Life Logic ($8B07-$8B26):**
 ```
@@ -973,15 +1044,19 @@ Main Loop (at $00E2):
 **Data Tables:**
 | Address | Purpose |
 |---------|---------|
-| `$F081-$F095` | Level configuration (cone pos, manholes) |
+| `$F081-$F095` | Level configuration (cone pos, manholes) -- **corrected 2026-11-08:** shadow-palette start values, `$F081-$F0A0` |
 | `$F0A0-$F0AA` | Player movement speed table |
 | `$F0AB-$F0B5` | Player facing direction offsets |
 | `$F0B6-$F0BF` | Sprite frame offsets |
-| `$F0C1-$F0FF` | Sprite character sets (4 chefs) |
+| `$F0C1-$F0FF` | Sprite character sets (4 chefs) -- **corrected 2026-11-08:** DLL template, `$F0C1-$F0F9` |
 | `$F0FA-$F19F` | Sprite palette and pattern data |
 | `$F200-$F2FF` | Enemy X position tables (64 bytes/chef) |
 | `$F300-$F3FF` | Enemy Y position tables (64 bytes/chef) |
 | `$1F89-$1F99` | Enemy sprite positions (RAM) |
+
+Corrected 2026-11-08: `$1F8A` onward is the DLL, copied from `$F0C1`, so the
+"enemy sprite positions" rows for `$1F8A-$1F99` in this table and the RAM
+tables above are DLL entries too (see `dat_F0C1`).
 
 ## Unused Space
 
@@ -1008,12 +1083,47 @@ These regions appear to be filler data from the original ROM dump and do not aff
 The music data at $B892-$B8F2 contains 97 bytes of frequency/duration pairs
 used by `sub_B732` to play the game's background music via the TIA audio chip.
 
+Corrected 2026-11-08: `$B87C-$B8FF` are four sound pointer tables, not note
+data; see `dat_B892` above.
+
 ### Total Free Space
 
 - **Identified zero padding: 624 bytes**
 - **Music data (used): 97 bytes**
 - **Space $FBD9-$FFFF: 1062 bytes** (not in disassembly)
 - **Total potential free space: 1686 bytes**
+
+**Corrected 2026-11-08: none of `$FBD9-$FFFF` is free, and the 1686-byte total
+does not hold.** The range is used from end to end:
+
+| Range | What it is |
+|-------|------------|
+| `$FBD9-$FF7E` | traced code and the tables it reads: the rest of the High Score Cart glue (which starts at `sub_FB6F`), the list data `dat_FBEF` (`$FBEF-$FC0F`) that `sub_FBA0` copies to `$1800`, the NMI stages `VEC_FC10` and `VEC_FC23`, `sub_FC3A`, `dat_FCA8`, and `sub_FCAC` through `sub_FF36`, ending with an `RTS` at `$FF7E` |
+| `$FF7F` | one byte (`$6B`) after that `RTS`, which nothing reaches |
+| `$FF80-$FFF7` | the cartridge signature the BIOS hashes |
+| `$FFF8-$FFF9` | the region byte (`$FF`) and the start-page byte (`$E7`) |
+| `$FFFA-$FFFF` | the NMI, RESET and IRQ vectors |
+
+"Not in disassembly" was true of the day-one listing at 3.2% coverage. The
+listing at 39.7% reaches all of `$FB6F-$FF7E`, as code or as tables that code
+reads.
+
+The zero-padding entries do not hold either. Counting the zero bytes in each:
+`$9F2F-$9FB2` has 2 of 132, `$9E43-$9EB2` has 4 of 112 (it overlaps the
+collision code at `$9E5A`), and `$C050-$C0AF`, `$C150-$C1AF`, `$C240-$C2AF`
+and `$C350-$C3AF` have 34-54 each. Only `$A043-$A0B2` (110 of 112) is nearly
+all zeros.
+
+What is really free has not been established. The ROM's long zero runs are
+in `$A000-$AFFF`, `$C000-$CFFF` and `$E000-$EFFF`. They repeat at the same
+offsets on each page (for example `$C1A2-$C1F7`, `$C2A2-$C2F5`, ...,
+`$C7A2-$C7F5`, and the same at `$E1A2`-`$E7F5`), which is how MARIA graphics
+pages are laid out, and in those pages a zero is a transparent pixel. They
+can be counted as free only after checking that no display-list header points
+into them. The runs `$CFB4-$CFF9` and `$EFB4-$EFF9` (70 bytes each, the
+second just below the RESET entry at `$EFFA`) sit on the last page of those
+blocks and need the same check. From `$FBD9` up, the one byte at `$FF7F` is
+the only byte that nothing is known to use.
 
 **Enemy State Machine:**
 - State flags in `$F7` control chef behavior
@@ -1032,7 +1142,7 @@ used by `sub_B732` to play the game's background music via the TIA audio chip.
 
 ### Ice Cream Cone
 - **1 cone per level** at random position
-- **32-second timer** (starts at `$37` = 55 frames, decrements)
+- **32-second timer** (starts at `$37` = 55 frames, decrements) -- **corrected 2026-11-08:** the `$37` is a colour written to `$1FDB`, P6C1's shadow, and nothing counts it down; see the note under "RAM Locations (Enemy/Level/Spawning)"
 - Cone position changes per level
 - Eating cone gives points and advances level
 
@@ -1057,6 +1167,10 @@ B8F2: F8 F8 F8 F8 F9 F9 FA FA FA FB FB F7 FB FB A2 0C
 
 The data consists of byte values that represent musical note frequencies/durations.
 The routine at $B732 reads this data and writes to AUDV0/AUDV1.
+
+Corrected 2026-11-08: these bytes are the sound pointer tables `$B87C-$B8FF`
+(low/high pointers to each sound's note stream and volume envelope), not
+note data; see `dat_B892` under the data tables above.
 
 ### Music Replay Feature
 The game supports instant replay (record and playback). Data locations:
@@ -1108,9 +1222,9 @@ When a level starts, `sub_9C28` initializes the replay system:
 
 | Address | Value | Purpose |
 |---------|-------|---------|
-| `$1FDB` | $37 | Cone timer start (55 frames = ~1 sec) |
-| `$1FDC` | $35 | Cone timer countdown |
-| `$1FDD` | $33 | Cone timer (32-second countdown) |
+| `$1FDB` | $37 | Cone timer start (55 frames = ~1 sec) -- **corrected 2026-11-08:** P6C1's shadow, see the note under "RAM Locations (Enemy/Level/Spawning)" |
+| `$1FDC` | $35 | Cone timer countdown -- **corrected 2026-11-08:** P6C2's shadow, see the note under "RAM Locations (Enemy/Level/Spawning)" |
+| `$1FDD` | $33 | Cone timer (32-second countdown) -- **corrected 2026-11-08:** P6C3's shadow, see the note under "RAM Locations (Enemy/Level/Spawning)" |
 | `$25E8-$25EB` | $9F9F8F8F | Recording buffer start addresses |
 | `$25CC-$25CF` | $1858D0D2 | Playback buffer start addresses |
 | `$250E-$2511` | $5A6A7888 | Recording position data |

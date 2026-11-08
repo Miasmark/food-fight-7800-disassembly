@@ -66,6 +66,13 @@ time. Resolving them -- with a live probe, or a `ram_vectors` entry once the
 values are known -- is the first job, and it is almost certainly what moves the
 coverage figure.
 
+**Update 2026-11-08:** both vectors have since been resolved live, and the
+evidence is in [DISCOVERY.md](DISCOVERY.md), section "What the replay says
+about the two vectors", not here. In short, `$0040` is a four-stage DLI chain:
+each NMI runs one stage and points the vector at the next, `$B3D7` -> `$B3F6`
+-> `$B428` -> `$B448` -> `$B3D7`, with the writer PCs counted over
+`run-01.inp`. `$00E2` is a mode vector that is written only at transitions.
+
 ## What's open
 
 Everything. Specifically, and in the order they look worth doing:
